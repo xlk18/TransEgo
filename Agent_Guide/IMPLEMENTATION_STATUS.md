@@ -11,7 +11,7 @@
 - Step 7：进行中（QA 监控与 rosbag 记录链路已建立，待实跑数据）
 - Step 8：进行中（系统级 launch 已建立，待接入实际 planner/fastlio 启动项）
 - Step 9：进行中（消融模板与指标脚本已建立，待仿真数据）
-- Step 10：部分完成（已完成本地 git 初始化与提交；远程推送受 SSH 权限阻塞）
+- Step 10：完成（本地提交与远程 `origin/main` 推送完成）
 
 ## 已完成
 
@@ -41,7 +41,7 @@
 4. 150+ 文献的 DOI/arXiv 双重校验与卡片填充。
 5. 基于真实实验结果更新论文定量章节。
 6. 初始化 git 仓库并完成 step10 提交归档。
-7. 解决 GitHub SSH key 权限后执行远程推送。
+7. 清理嵌入仓库状态（`quadrotor_PID_controller` / `FAST_LIO`）并统一子模块策略。
 
 ## 验收原则
 
