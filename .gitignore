@@ -1,0 +1,18 @@
+# Build
+build/
+devel/
+install/
+**/build/
+
+# Python
+__pycache__/
+*.pyc
+
+# Logs / tmp
+*.log
+*.bag.active
+
+# Local helper scripts generated during scaffolding
+scaffold.py
+generate_all_agents_code.py
+topics.txt
