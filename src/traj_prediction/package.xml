@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>traj_prediction</name>
+  <version>0.1.0</version>
+  <description>Trajectory prediction node for dynamic obstacles.</description>
+  <maintainer email="dev@transego.local">TransEgo</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>rospy</build_depend>
+  <build_depend>std_msgs</build_depend>
+
+  <exec_depend>rospy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+</package>

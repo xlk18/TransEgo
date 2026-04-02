@@ -1,0 +1,6 @@
+<launch>
+  <!-- Minimal stack for new modules only -->
+  <include file="$(find mot_perception)/launch/mot_perception.launch"/>
+  <include file="$(find traj_prediction)/launch/traj_prediction.launch"/>
+  <include file="$(find mpc_controller)/launch/mpc_controller.launch"/>
+</launch>

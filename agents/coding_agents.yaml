@@ -1,0 +1,45 @@
+coding_agents:
+  - id: 1
+    name: Agent-Code-01
+    module: FAST_LIO 接口适配
+    status: in_progress
+  - id: 2
+    name: Agent-Code-02
+    module: mot_perception 动态点云检测
+    status: done
+  - id: 3
+    name: Agent-Code-03
+    module: mot_perception 跟踪输出协议
+    status: in_progress
+  - id: 4
+    name: Agent-Code-04
+    module: traj_prediction 推理节点
+    status: done
+  - id: 5
+    name: Agent-Code-05
+    module: traj_prediction TensorRT节点
+    status: pending
+  - id: 6
+    name: Agent-Code-06
+    module: Ego-Planner 动态代价项
+    status: pending
+  - id: 7
+    name: Agent-Code-07
+    module: Ego-Planner 预测输入接口
+    status: pending
+  - id: 8
+    name: Agent-Code-08
+    module: mpc_controller 核心控制
+    status: done
+  - id: 9
+    name: Agent-Code-09
+    module: PX4 对接与参数整定
+    status: in_progress
+  - id: 10
+    name: Agent-Code-10
+    module: Gazebo 动态场景
+    status: pending
+  - id: 11
+    name: Agent-Code-11
+    module: 系统级 launch 联调
+    status: in_progress

@@ -1,0 +1,7 @@
+<launch>
+  <node pkg="mpc_controller" type="mpc_controller_node" name="mpc_controller" output="screen">
+    <param name="kp_pos" value="2.0"/>
+    <param name="kd_vel" value="0.8"/>
+    <param name="hover_thrust" value="0.50"/>
+  </node>
+</launch>

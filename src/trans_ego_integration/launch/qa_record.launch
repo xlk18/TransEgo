@@ -1,0 +1,7 @@
+<launch>
+  <arg name="bag_name" default="trans_ego_step7"/>
+  <arg name="out_dir" default="$(env HOME)/TransEgo/logs/rosbags"/>
+
+  <node pkg="rosbag" type="record" name="qa_bag_record" output="screen"
+        args="-O $(arg out_dir)/$(arg bag_name).bag /livox/lidar /dynamic_cloud /mot_tracks /predicted_trajectories /position_cmd /Odometry /mavros/setpoint_raw/attitude"/>
+</launch>

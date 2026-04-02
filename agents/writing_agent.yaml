@@ -1,0 +1,13 @@
+writing_agent:
+  id: 1
+  name: Agent-Writing-01
+  input:
+    - research/Summary.md
+    - papers/Summary.md
+    - logs/agent_dev_logs/
+  output:
+    - papers/Academic_Paper.md
+  constraints:
+    - no_fake_citation
+    - no_fake_experiment
+    - require_doi_or_arxiv
