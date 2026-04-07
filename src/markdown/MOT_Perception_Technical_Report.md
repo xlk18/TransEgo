@@ -8,7 +8,7 @@
 1. **输入与预处理**：从原始 `/livox/lidar` 收取大规模点云，执行硬件级 Voxel 降采样、通过 PassThrough 滤除安全高度外的非活动区，并使用 SAC-RANSAC 平面拟合算法剔除地平面干扰。
 2. **聚类检测**：利用基于 Kd-Tree 驱动的 Euclidean Cluster Extraction 提供高鲁棒性的 3D Bounding Box （目标包围盒）实例化检测。
 3. **数据关联(Data Association)**：结合匈牙利算法求解由尺寸距离误差、速度指向夹角所组合的二分图多元关联代价矩阵（Cost Matrix）。
-4. **混合预测追踪 (Kalman + DL Transformer)**：对于合法追踪（CONFIRMED）目标，使用标准卡尔曼(Kalman Velocity Model)与重载的 Transformer 引擎双线预测，赋予系统在目标受到环境遮挡(LOST)时强大的“寻回(Cold-start/Recovery)能力”。
+4. **混合预测与高内聚自回归追踪 (Kalman + DL Transformer)**：废弃了松耦合的冗余节点架构。在目标可见时使用标准卡尔曼平滑；当目标受到环境遮挡(LOST)时，跳过卡尔曼线性先验，直接利用 Transformer 进行纯净历史特征的自回归(Auto-regressive)非线性闭环推演。极大提升了系统在复杂环境下的丢失寻回(Recovery)能力。
 5. **动态背景分离**：在输出建图点云前执行逆遍历，将存在跟踪的移动人员/车辆抠除，输出一张纯净静态的世界地图（`static_cloud`）供给下游碰撞规划器（Ego-Planner）。
 
 ---
@@ -28,9 +28,11 @@
 *   **输出**：当前帧的所有未加编号的 `std::vector<BoundingBox>`。
 
 ### 阶段三：混合预测与追踪更新 (`trackObjects`)
-*   **预测层**：追踪器内部优先使用 `tracker.predict(dt)` 卡尔曼线性延展；若 `use_transformer` 开启，则抽提追踪器内部的历史滑窗数据（10 个特征点）推入 GPU TensorRT；
-*   **关联层**：根据“空间欧式距离 + Box边界差集惩罚 + 速度/夹角反向惩罚(防包交叉)” 形成二维代价矩阵。再将代价矩阵委托给匈牙利矩阵 (`HungarianAlgorithm`) 解算出本帧的最优框匹配配对。
-*   **更新层**：若未超过 `max_distance` 的阈值容错，则喂入卡尔曼观测值。更新存活时长(age)，消除过时过期对象。
+*   **预测先验层**：追踪器内部先使用 `tracker.predict(dt)` 进行卡尔曼线性延展，为后续提供先验估计。
+*   **关联与更新层**：根据“空间欧式距离 + Box边界差集惩罚 + 速度/夹角反向惩罚” 形成代价矩阵，委托给匈牙利算法 (`HungarianAlgorithm`) 解算。若未超过 `max_distance` 的阈值，则使用检测框更新卡尔曼观测值。
+*   **自回归闭环推演层 (Deep Learning)**：(新增架构) 若 `use_transformer` 开启：
+    *   **正常匹配态**：将高精度的后验状态录入历史队列，并基于纯净历史调用 TensorRT 输出未来 20 帧预测曲线。
+    *   **遮挡恢复态 (LOST)**：拒绝将卡尔曼污染的纯推测态存入历史。提取上帧为止的纯净历史进行 Transformer 单步推理，随后用预测出的首个点**强制重写**内部状态位姿（`overridePositionByDeepModel`），再将这个“自回归推断状态”录入历史队列。这赋予了系统在目标受到环境遮挡时完美的时间序列无缝自回归推演闭环能力。
 *   **输出**：维护稳定的全局追踪列表 `std::vector<KalmanFilter> trackers_`。
 
 ### 阶段四：渲染与剔除 (`publishMarkers` & `Static Map Generator`)

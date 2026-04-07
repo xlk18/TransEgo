@@ -46,8 +46,9 @@ void KalmanFilter::predict(double dt)
     time_since_update_++; // 未更新时间递增
     age_++;               // 目标生命周期递增
 
-    // 如果目标处于确认状态且在当前周期未被观测到，则将其状态设为丢失
-    if (time_since_update_ > 0 && track_state_ == CONFIRMED)
+    // 如果目标处于确认状态且在上一周期未被观测到(未进入update流程)，则将其状态设为丢失
+    // time_since_update_ 只有在 > 1 时才意味着至少错过了一次关联
+    if (time_since_update_ > 1 && track_state_ == CONFIRMED)
     {
         track_state_ = LOST;
     }

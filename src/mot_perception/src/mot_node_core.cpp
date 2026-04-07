@@ -331,93 +331,14 @@ std::vector<BoundingBox> MOTNode::getDetections(const pcl::PointCloud<PointType>
 void MOTNode::trackObjects(const std::vector<BoundingBox> &detections, double dt, const ros::Time &stamp)
 {
     // =========================================================================
-    // --- 第一阶段：追踪目标状态的前向预测（卡尔曼 + 深度学习大模型方案） ---
+    // --- 第一阶段：追踪目标状态的前向预测（卡尔曼） ---
     // =========================================================================
-    visualization_msgs::MarkerArray pred_markers;
 
     for (auto &tracker : trackers_)
     {
-        // 1. 卡尔曼滤波器执行线性状态预测
+        // 1. 卡尔曼滤波器执行线性状态预测 (为后续数据关联提供 Prior 估计)
         tracker.predict(dt);
-
-        // 2. Transformer 轨迹序列预测 (当开关启用时)
-        if (use_transformer_ && (tracker.getTrackState() == CONFIRMED || tracker.getTrackState() == LOST))
-        {
-            // 记录当前状态，为模型提供历史序列信息
-            tracker.recordHistory(tracker.getState());
-
-            // --- 执行 TensorRT 推理任务 ---
-            std::vector<float> input_data = tracker.getHistoricalFeatures(HIST_LEN, FEAT_DIM);
-            std::vector<Eigen::Matrix<double, 6, 1>> predicted_curve;
-
-            if (context_ && input_index_ >= 0 && input_index_ < 2 && output_index_ >= 0 && output_index_ < 2)
-            {
-                // 将输入特征数据从 CPU 拷贝至 GPU 显存 (HostToDevice)
-                cudaMemcpy(buffers_[input_index_], input_data.data(), input_data.size() * sizeof(float), cudaMemcpyHostToDevice);
-                // 调用推理引擎，生成未来预测序列
-                context_->executeV2(buffers_);
-
-                std::vector<float> output_data(FUT_LEN * OUT_DIM, 0.0f);
-                // 将预测结果从 GPU 取回至 CPU 内存 (DeviceToHost)
-                cudaMemcpy(output_data.data(), buffers_[output_index_], output_data.size() * sizeof(float), cudaMemcpyDeviceToHost);
-
-                // 解析模型输出的未来预测点云轨迹与方差
-                for (int f = 0; f < FUT_LEN; ++f)
-                {
-                    Eigen::Matrix<double, 6, 1> pt;
-                    pt << output_data[f * OUT_DIM], output_data[f * OUT_DIM + 1], output_data[f * OUT_DIM + 2],
-                        output_data[f * OUT_DIM + 3], output_data[f * OUT_DIM + 4], output_data[f * OUT_DIM + 5];
-                    predicted_curve.push_back(pt);
-                }
-            }
-
-            // 将预测轨迹保存在追踪器中，供目标遮挡丢失情况下的数据关联使用
-            tracker.setPredictedCurve(predicted_curve);
-
-            // 丢失目标状态兜底机制：使用模型预测的首个未来点修正卡尔曼滤波器的推测坐标
-            if (tracker.getTrackState() == LOST && !predicted_curve.empty())
-            {
-                tracker.overridePositionByDeepModel(predicted_curve[0].head<3>());
-            }
-
-            // 组装用于轨迹可视化的 Marker 信息
-            if (!predicted_curve.empty())
-            {
-                visualization_msgs::Marker marker;
-                marker.header.frame_id = world_frame_;
-                marker.header.stamp = stamp; // 修复时间戳脱节问题
-                marker.ns = "prediction";
-                marker.id = tracker.getId();
-                marker.type = visualization_msgs::Marker::SPHERE_LIST;
-                marker.action = visualization_msgs::Marker::ADD;
-                marker.scale.x = 0.2;
-                marker.scale.y = 0.2;
-                marker.scale.z = 0.2;
-                marker.color.a = 1.0;
-                marker.color.r = 1.0;
-                marker.color.g = 0.5;
-                for (const auto &pt : predicted_curve)
-                {
-                    geometry_msgs::Point p;
-                    std_msgs::ColorRGBA c;
-
-                    p.x = pt[0];
-                    p.y = pt[1];
-                    p.z = pt[2];
-                    marker.points.push_back(p);
-
-                    // 将预估的方差/标准差借用颜色通道传递给局导模块作为避障安全半径膨胀
-                    c.r = pt[3];
-                    c.g = pt[4];
-                    c.b = pt[5];
-                    c.a = 1.0;
-                    marker.colors.push_back(c);
-                }
-                pred_markers.markers.push_back(marker);
-            }
-        }
     }
-    pub_pred_trajs_.publish(pred_markers); // 发布所有轨迹预测结果
 
     // --- 第二阶段：冷启动/无历史目标的初始化处理 ---
     if (trackers_.empty())
@@ -537,6 +458,142 @@ void MOTNode::trackObjects(const std::vector<BoundingBox> &detections, double dt
         {
             ++it; // 保留活跃或刚丢失不久的目标，指针后移
         }
+    }
+
+    // =========================================================================
+    // --- 第六单元（新增）：深度大模型推理与自回归状态闭环 ---
+    // =========================================================================
+    visualization_msgs::MarkerArray pred_markers;
+
+    if (use_transformer_)
+    {
+        for (auto &tracker : trackers_)
+        {
+            if (tracker.getTrackState() != CONFIRMED && tracker.getTrackState() != LOST)
+                continue;
+
+            // 判断依据：如果本帧在第四单元没有执行 update()，其 TimeSinceUpdate 就会大于 0，说明处于遮挡态
+            bool is_occluded = (tracker.getTimeSinceUpdate() > 0);
+            std::vector<Eigen::Matrix<double, 6, 1>> predicted_curve;
+
+            if (is_occluded)
+            {
+                // 【核心：自回归接管】
+                // 此时 tracker 内部状态是被卡尔曼线性 predict 污染的。不能将其录入历史！
+                // 我们直接提取上一帧为止的纯净历史，进行单步 Transformer 推理
+                std::vector<float> input_data = tracker.getHistoricalFeatures(HIST_LEN, FEAT_DIM);
+                if (context_ && input_index_ >= 0 && output_index_ >= 0)
+                {
+                    cudaMemcpy(buffers_[input_index_], input_data.data(), input_data.size() * sizeof(float), cudaMemcpyHostToDevice);
+                    context_->executeV2(buffers_);
+                    std::vector<float> output_data(FUT_LEN * OUT_DIM, 0.0f);
+                    cudaMemcpy(output_data.data(), buffers_[output_index_], output_data.size() * sizeof(float), cudaMemcpyDeviceToHost);
+
+                    // 1. 使用 Transformer 预测的当前时刻点（输出的第0点）强制覆盖被 KF 弄偏的位置
+                    tracker.overridePositionByDeepModel(Eigen::Vector3d(output_data[0], output_data[1], output_data[2]));
+
+                    // 2. 组装发往 Ego-Planner 的未来预测序列，此处必须从 f=0 开始以对齐 Ego 时间轴
+                    for (int f = 0; f < FUT_LEN; ++f)
+                    {
+                        Eigen::Matrix<double, 6, 1> pt;
+                        pt[0] = output_data[f * OUT_DIM];
+                        pt[1] = output_data[f * OUT_DIM + 1];
+                        pt[2] = output_data[f * OUT_DIM + 2];
+                        if (OUT_DIM >= 6)
+                        {
+                            pt[3] = output_data[f * OUT_DIM + 3];
+                            pt[4] = output_data[f * OUT_DIM + 4];
+                            pt[5] = output_data[f * OUT_DIM + 5];
+                        }
+                        else
+                        {
+                            pt[3] = 1.0;
+                            pt[4] = 0.5;
+                            pt[5] = 0.0;
+                        }
+                        predicted_curve.push_back(pt);
+                    }
+                }
+
+                // 将被 Transformer 重写修正后的“自回归推断状态”录入历史队列，实现完美首尾相连！
+                tracker.recordHistory(tracker.getState());
+            }
+            else
+            {
+                // 【正常匹配】
+                // 先将包含了本帧真实检测框后验修正的高质量状态录入历史
+                tracker.recordHistory(tracker.getState());
+
+                // 基于最新高质量历史推演未来
+                std::vector<float> input_data = tracker.getHistoricalFeatures(HIST_LEN, FEAT_DIM);
+                if (context_ && input_index_ >= 0 && output_index_ >= 0)
+                {
+                    cudaMemcpy(buffers_[input_index_], input_data.data(), input_data.size() * sizeof(float), cudaMemcpyHostToDevice);
+                    context_->executeV2(buffers_);
+                    std::vector<float> output_data(FUT_LEN * OUT_DIM, 0.0f);
+                    cudaMemcpy(output_data.data(), buffers_[output_index_], output_data.size() * sizeof(float), cudaMemcpyDeviceToHost);
+
+                    for (int f = 0; f < FUT_LEN; ++f)
+                    {
+                        Eigen::Matrix<double, 6, 1> pt;
+                        pt[0] = output_data[f * OUT_DIM];
+                        pt[1] = output_data[f * OUT_DIM + 1];
+                        pt[2] = output_data[f * OUT_DIM + 2];
+                        if (OUT_DIM >= 6)
+                        {
+                            pt[3] = output_data[f * OUT_DIM + 3];
+                            pt[4] = output_data[f * OUT_DIM + 4];
+                            pt[5] = output_data[f * OUT_DIM + 5];
+                        }
+                        else
+                        {
+                            pt[3] = 1.0;
+                            pt[4] = 0.5;
+                            pt[5] = 0.0;
+                        }
+                        predicted_curve.push_back(pt);
+                    }
+                }
+            }
+
+            // 更新追踪器内部的预估曲线（供下一帧第三单元的遮挡匈牙利关联使用）
+            tracker.setPredictedCurve(predicted_curve);
+
+            // 构建并发送给 Ego-Planner 的可视化 Marker
+            if (!predicted_curve.empty())
+            {
+                visualization_msgs::Marker marker;
+                marker.header.frame_id = world_frame_;
+                marker.header.stamp = stamp;
+                marker.ns = "prediction";
+                marker.id = tracker.getId();
+                marker.type = visualization_msgs::Marker::SPHERE_LIST;
+                marker.action = visualization_msgs::Marker::ADD;
+                marker.scale.x = 0.2;
+                marker.scale.y = 0.2;
+                marker.scale.z = 0.2;
+                marker.color.a = 1.0;
+                marker.color.r = 1.0;
+                marker.color.g = 0.5;
+
+                for (const auto &pt : predicted_curve)
+                {
+                    geometry_msgs::Point p;
+                    std_msgs::ColorRGBA c;
+                    p.x = pt[0];
+                    p.y = pt[1];
+                    p.z = pt[2];
+                    marker.points.push_back(p);
+                    c.r = pt[3];
+                    c.g = pt[4];
+                    c.b = pt[5];
+                    c.a = 1.0;
+                    marker.colors.push_back(c);
+                }
+                pred_markers.markers.push_back(marker);
+            }
+        }
+        pub_pred_trajs_.publish(pred_markers);
     }
 }
 
