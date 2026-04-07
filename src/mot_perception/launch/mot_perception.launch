@@ -1,8 +1,0 @@
-<launch>
-  <node pkg="mot_perception" type="mot_perception_node" name="mot_perception" output="screen">
-    <param name="leaf_size" value="0.12"/>
-    <param name="cluster_tolerance" value="0.35"/>
-    <param name="min_cluster_size" value="10"/>
-    <param name="max_cluster_size" value="5000"/>
-  </node>
-</launch>

@@ -1,0 +1,5 @@
+<launch>
+  <node pkg="mot_perception" type="mot_node" name="mot_node" output="screen">
+    <rosparam command="load" file="$(find mot_perception)/config/mot_params.yaml" />
+  </node>
+</launch>

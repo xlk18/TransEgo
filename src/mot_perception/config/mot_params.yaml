@@ -1,0 +1,44 @@
+# 多目标追踪感知 (MOT Perception) 参数配置
+
+# --- 传感器与预处理参数 ---
+# lidar_topic: "/cloud_registered"   # 激光雷达世界系点云
+# world_frame: "camera_init"            # 全局世界坐标系的名称TF
+lidar_topic: "/livox/lidar"   # 激光雷达输入话题，订阅未经处理的原始点云
+voxel_size: 0.1               # Voxel体素降采样叶尺寸(m)，越小细节越多但计算量成倍增加
+distance_threshold: 0.2       # RANSAC地平面分割的距离阈值(m)，低于此高度点将被视为地面剔除
+z_min: -1.0                   # 直通滤波Z轴下限，过滤掉无人机下方不相关的点云
+z_max: 2.0                    # 直通滤波Z轴上限，过滤掉高空的安全区域点云以节约算力
+eps_angle: 0.261799           # RANSAC倾斜偏差角度容忍值，默认 15度 (15 * π / 180 = ~0.2618)
+
+tf_timeout: 0.1               # TF查找超时等待容忍时间(s)
+
+# --- 欧式聚类(Euclidean Clustering)与障碍物检测 ---
+cluster_tolerance: 0.5        # 聚类最大点间距(m)，此距离内的点将被粘连聚类成同一个障碍物对象
+min_cluster_size: 10          # 形成聚类的最小点云数量，用于过滤微小的漂浮噪点
+max_cluster_size: 50000       # 形成聚类的最大点云数量，用于过滤过大连通块(如整面墙壁)
+
+# --- 卡尔曼滤波(Kalman Filter)动态预估参数 ---
+dt: 0.1                       # 追踪系统的每步状态转移时间周期(s)
+q_factor: 1.0                 # 过程噪声协方差(Q)因子，值越大越表示无人机更相信当前雷达观测，而不相信历史动力学推演
+r_factor: 0.1                 # 观测噪声协方差(R)因子，反映传感器的精度，越小表示传感器精度极高
+p_factor: 10.0                # 初始状态协方差(P)放大因子，反映刚刚冷启动发现新目标时，初始状态的极大不确定度
+
+# --- 生命周期与数据关联(Data Association) ---
+max_age: 5                    # 航迹允许的最大连续丢失帧数 (Lost_age超过此硬性指标即注销该轨迹)
+min_hits: 3                   # 确认航迹所需的最少连续雷达击中次数 (击中>=3次才进入CONFIRM跟踪态，防假阳性)
+
+# --- 新增的动态参数逻辑配置 ---
+dynamic_bbx_expansion: 0.3      # 判断动态点云包围盒向外的膨胀阈值（米），越大则周边的点越容易被囊括进物体，但也可能吃掉背景
+size_penalty_weight: 1.5        # 数据关联环节（匈牙利匹配）时长宽高尺寸差异惩罚的影响权重。默认为1.5
+angle_penalty_weight: 2.0       # 数据关联环节中，前述估计速度朝向与新中心连线差异的惩罚权重系数，防交叉调包现象
+vel_heading_thresh: 0.1         # 当追踪器的估计速度大于该值(m/s)时，才激活动态方向夹角角度惩罚
+
+# --- 深度学习 Transformer 特征与路径配置 ---
+use_transformer: true         # 核心开关：是否启用神经网络进行轨迹预测评估。如果关闭，完全退化为卡尔曼匀速/匀加速推演
+hist_len: 10                  # 预测时输入给模型的历史时间步长度（即保存并滑动的帧数），这决定了历史经验窗口的大小
+fut_len: 20                   # 传入模型希望其外推未来轨迹的时间步数
+feat_dim: 6                   # 输入给模型的特征维度长度（目前默认为x,y,z,vx,vy,vz的6维排列）
+out_dim: 6                    # 模型输出的空间坐标及方差维度 [x, y, z, std_x, std_y, std_z]
+engine_path: "/home/yyf/TransEgo/src/traj_prediction/models/transformer_model.engine" # 编译好的 TensorRT 模型挂载路径
+world_frame: "map"            # 全局世界坐标系的名称TF
+max_distance: 1.5             # 匈牙利算法最大允许的关联几何代价

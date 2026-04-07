@@ -1,6 +1,0 @@
-<launch>
-  <node pkg="traj_prediction" type="transformer_predict.py" name="traj_prediction" output="screen">
-    <param name="horizon" value="10"/>
-    <param name="dt" value="0.1"/>
-  </node>
-</launch>

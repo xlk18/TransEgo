@@ -1,0 +1,27 @@
+mass: 1.5
+gravity: 9.81
+dt: 0.05
+N: 20
+max_thrust: 25.0
+min_thrust: 1.0
+max_bodyrate_x: 3.14
+max_bodyrate_y: 3.14
+max_bodyrate_z: 1.5
+
+use_aero_drag_and_delay: true
+
+# 注意 Advanced SO(3) Error-State NMPC 所需要的状态约束降阶回了9维:
+# [ p(3), v(3), dtheta(3) ]
+Q_diag_advanced: [80.0, 80.0, 120.0,   # Position error penalty
+                  10.0, 10.0, 15.0,    # Velocity error penalty
+                  5.0,  5.0,  3.0]     # Angular SO(3) error penalty
+
+# 控制约束：Thrust, w_x, w_y, w_z
+R_diag: [0.1, 0.5, 0.5, 0.5]
+terminal_cost_multiplier: 10.0
+
+drag_x: 0.15
+drag_y: 0.15
+drag_z: 0.10
+tau_thrust: 0.05
+tau_rate: 0.02

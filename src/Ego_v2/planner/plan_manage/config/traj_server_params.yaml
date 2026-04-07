@@ -1,0 +1,5 @@
+# Ego-Planner 向 MPC 下发推演轨迹的配置参数
+
+traj_server:
+  N_mpc: 20      # 向前外推预测的离散点个数 (步长数)，需与 mpc_params.yaml 中的预测步数严格对齐
+  dt_mpc: 0.05   # 每两步之间的时间间隔 (s)，也需要与 NMPC 设定一致以保证时空尺度匹配

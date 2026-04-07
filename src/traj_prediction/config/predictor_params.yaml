@@ -1,0 +1,14 @@
+# TensorRT 轨迹预测模型 (TRT Predictor) 参数配置
+
+# --- 模型部署路径与硬件 ---
+engine_path: "/home/yyf/TransEgo/src/traj_prediction/models/transformer_model.engine" # 序列化后的 TensorRT 引擎权重文件的绝对路径
+
+# --- 网络输入输出张量维度 (Tensor Dimensions) ---
+hist_len: 10         # 历史轨迹提取帧数 (必须与通过PyTorch训出的模型尺寸严格一致)
+fut_len: 20          # 模型预测输出的未来轨迹帧数序列长度
+feat_dim: 6          # 每一个历史时间步包含的数据维度特征，如 [x, y, z, v_x, v_y, v_z]
+out_dim: 6           # 预测结果每个时间步的空间状态以及高斯标准差 [x, y, z, std_x, std_y, std_z] 以供避障膨胀
+
+# --- ROS话题通信节点配置 ---
+mot_topic_name: "/mot_markers"                                     # 需订阅的上游多目标追踪 (MOT) 获取目标状态的话题名
+pred_topic_name: "/traj_prediction/predicted_trajectories"         # 给下游规划控制 (Ego-Planner) 发布的包含未来所有目标轨迹线的话题名

@@ -1,4 +1,0 @@
-trial,method,success,flight_time,replan_count,jerk_integral
-1,baseline_ego,0,0,0,0
-1,kf_plus_ego,0,0,0,0
-1,trans_ego,0,0,0,0

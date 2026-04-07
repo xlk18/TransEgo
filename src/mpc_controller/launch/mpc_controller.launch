@@ -1,7 +1,5 @@
 <launch>
-  <node pkg="mpc_controller" type="mpc_controller_node" name="mpc_controller" output="screen">
-    <param name="kp_pos" value="2.0"/>
-    <param name="kd_vel" value="0.8"/>
-    <param name="hover_thrust" value="0.50"/>
+  <node pkg="mpc_controller" type="mpc_node" name="mpc_node" output="screen">
+    <rosparam command="load" file="$(find mpc_controller)/config/mpc_params.yaml" />
   </node>
 </launch>

@@ -1,0 +1,7 @@
+<launch>
+  <!-- 启动 TensorRT 轨迹预测节点 -->
+  <node pkg="traj_prediction" type="trt_predictor_node" name="trt_predictor_node" output="screen">
+    <!-- 加载预测网络维度的硬性参数 -->
+    <rosparam command="load" file="$(find traj_prediction)/config/predictor_params.yaml" />
+  </node>
+</launch>

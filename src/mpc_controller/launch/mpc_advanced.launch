@@ -1,0 +1,5 @@
+<launch>
+    <node pkg="mpc_controller" type="advanced_mpc_node" name="advanced_mpc_node" output="screen">
+        <rosparam command="load" file="$(find mpc_controller)/config/mpc_params_advanced.yaml" />
+    </node>
+</launch>
