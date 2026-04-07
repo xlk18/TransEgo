@@ -12,8 +12,10 @@
 using namespace Eigen;
 using namespace std;
 // 构造函数：初始化 ROS 节点、加载参数、配置发布者和订阅者
-MOTNode::MOTNode(ros::NodeHandle &nh) : nh_(nh), current_id_(0), last_time_(0.0), runtime_(nullptr), engine_(nullptr), context_(nullptr)
+MOTNode::MOTNode(ros::NodeHandle &nh) : input_index_(-1), output_index_(-1), nh_(nh), current_id_(0), last_time_(0.0), runtime_(nullptr), engine_(nullptr), context_(nullptr)
 {
+    buffers_[0] = nullptr;
+    buffers_[1] = nullptr;
     ros::NodeHandle pnh("~"); // 创建私有节点句柄，用于读取当前节点的配置参数
 
     // --- 第一部分：读取 ROS 参数服务器配置 ---
@@ -138,8 +140,10 @@ MOTNode::~MOTNode()
     // 如果显存曾被成功分配，则归还释放输入/输出的纯粹 GPU 空间
     if (input_index_ >= 0 && input_index_ < 2 && output_index_ >= 0 && output_index_ < 2)
     {
-        cudaFree(buffers_[input_index_]);
-        cudaFree(buffers_[output_index_]);
+        if (buffers_[input_index_])
+            cudaFree(buffers_[input_index_]);
+        if (buffers_[output_index_])
+            cudaFree(buffers_[output_index_]);
     }
     // 按照被依赖的生成层级从上至下依次执行销毁，防止发生资源悬空与内存泄漏
     if (context_)

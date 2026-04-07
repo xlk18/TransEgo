@@ -1,6 +1,9 @@
 #include <ros/ros.h>
 #include <visualization_msgs/MarkerArray.h>
 #include <visualization_msgs/Marker.h>
+#include <deque>
+#include <map>
+#include <geometry_msgs/Point.h>
 #include <std_msgs/ColorRGBA.h>
 #include <NvInfer.h>
 #include <cuda_runtime_api.h>
@@ -47,10 +50,13 @@ private:
     ros::NodeHandle nh_;
     ros::Publisher pred_pub_; // 预测出的点连线数组播发器
     ros::Subscriber mot_sub_; // 订阅历史跟踪坐标信息的监听器
+    std::map<int, std::deque<geometry_msgs::Point>> history_buffer_;
 
 public:
-    TrtPredictor() : nh_("~")
+    TrtPredictor() : nh_("~"), input_index_(-1), output_index_(-1)
     {
+        buffers_[0] = nullptr;
+        buffers_[1] = nullptr;
         // 1. 读取 YAML 参数文件或启动命令中覆写的运行参数并赋予默认值
         nh_.param<std::string>("engine_path", engine_path_, "/home/yyf/TransEgo/src/traj_prediction/models/transformer_model.engine");
         nh_.param<int>("hist_len", HIST_LEN, 10);
@@ -92,8 +98,10 @@ public:
     ~TrtPredictor()
     {
         // 析构函数中：严密注销释放 GPU 中的残留数据缓存并清退 Trt 指针
-        cudaFree(buffers_[input_index_]);
-        cudaFree(buffers_[output_index_]);
+        if (input_index_ >= 0 && buffers_[input_index_])
+            cudaFree(buffers_[input_index_]);
+        if (output_index_ >= 0 && buffers_[output_index_])
+            cudaFree(buffers_[output_index_]);
         if (context_)
             context_->destroy();
         if (engine_)
@@ -105,6 +113,9 @@ public:
     // 真机或仿真环境传来的 MOT 回调处理函数（主运算循环）
     void motCallback(const visualization_msgs::MarkerArray::ConstPtr &msg)
     {
+        if (!context_)
+            return;
+
         if (msg->markers.empty()) // 无有效对象则退回
             return;
 
@@ -123,13 +134,19 @@ public:
             std::vector<float> input_data(HIST_LEN * FEAT_DIM, 0.0f);
             std::vector<float> output_data(FUT_LEN * OUT_DIM, 0.0f);
 
+            auto &history = history_buffer_[m.id];
+            history.push_back(m.pose.position);
+            if (history.size() > HIST_LEN)
+                history.pop_front();
+
             // 步骤一：获取检测框的中心给所有历史填充（简版实现，仅用来测试链路闭环）
             for (int k = 0; k < HIST_LEN; ++k)
             {
-                // 用当前这一帧单点去粗略填充长度为 HIST_LEN 的特征时序 (正式应用需改成保存的真历史)
-                input_data[k * FEAT_DIM + 0] = m.pose.position.x;
-                input_data[k * FEAT_DIM + 1] = m.pose.position.y;
-                input_data[k * FEAT_DIM + 2] = m.pose.position.z;
+                int idx = k < (HIST_LEN - history.size()) ? 0 : k - (HIST_LEN - history.size());
+                auto pt = history[idx];
+                input_data[k * FEAT_DIM + 0] = pt.x;
+                input_data[k * FEAT_DIM + 1] = pt.y;
+                input_data[k * FEAT_DIM + 2] = pt.z;
             }
 
             // 步骤二：实施高性能 GPU 推理流水线

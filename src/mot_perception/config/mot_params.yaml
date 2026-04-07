@@ -40,5 +40,5 @@ fut_len: 20                   # 传入模型希望其外推未来轨迹的时间
 feat_dim: 6                   # 输入给模型的特征维度长度（目前默认为x,y,z,vx,vy,vz的6维排列）
 out_dim: 6                    # 模型输出的空间坐标及方差维度 [x, y, z, std_x, std_y, std_z]
 engine_path: "/home/yyf/TransEgo/src/traj_prediction/models/transformer_model.engine" # 编译好的 TensorRT 模型挂载路径
-world_frame: "map"            # 全局世界坐标系的名称TF
+world_frame: "world"            # 全局世界坐标系的名称TF
 max_distance: 1.5             # 匈牙利算法最大允许的关联几何代价
