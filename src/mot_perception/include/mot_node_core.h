@@ -38,6 +38,7 @@ class MOTNode
 {
 public:
     MOTNode(ros::NodeHandle &nh);
+    ~MOTNode();
 
     void cloudCallback(const sensor_msgs::PointCloud2ConstPtr &msg);
 

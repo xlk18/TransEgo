@@ -344,7 +344,7 @@ void MOTNode::trackObjects(const std::vector<BoundingBox> &detections, double dt
 
             // --- 执行 TensorRT 推理任务 ---
             std::vector<float> input_data = tracker.getHistoricalFeatures(HIST_LEN, FEAT_DIM);
-            std::vector<Eigen::Vector3d> predicted_curve;
+            std::vector<Eigen::Matrix<double, 6, 1>> predicted_curve;
 
             if (context_ && input_index_ >= 0 && input_index_ < 2 && output_index_ >= 0 && output_index_ < 2)
             {

@@ -1,3 +1,4 @@
+#include <nav_msgs/Path.h>
 #include "../include/quadrotor_nmpc.h"
 
 using namespace casadi;

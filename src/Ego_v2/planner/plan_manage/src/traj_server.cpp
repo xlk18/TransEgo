@@ -1,3 +1,4 @@
+#include <tf2/LinearMath/Quaternion.h>
 #include <nav_msgs/Odometry.h>
 #include <nav_msgs/Path.h>
 #include <trajectory_msgs/MultiDOFJointTrajectory.h>

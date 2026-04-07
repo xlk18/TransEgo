@@ -1723,4 +1723,3 @@ namespace ego_planner
   void PolyTrajOptimizer::setUseMultitopologyTrajs(bool use_multitopology_trajs) { multitopology_data_.use_multitopology_trajs = use_multitopology_trajs; }
 
 } // namespace ego_planner
-/* 
