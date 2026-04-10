@@ -15,12 +15,12 @@ double HungarianAlgorithm::Solve(std::vector<std::vector<double>> &DistMatrix, s
     int *assignment = new int[nRows];                 // 申请数组存储每行的分配结果
     double cost = 0.0;                                // 初始化最优匹配总代价计算器
 
-    // 遍历二维矩阵，按列优先法则展平填充到一维数组
+    // 遍历二维矩阵，按行优先法则展平填充到一维数组
     for (unsigned int i = 0; i < nRows; i++)
     {
         for (unsigned int j = 0; j < nCols; j++)
         {
-            distMatrixIn[i + nRows * j] = DistMatrix[i][j]; // 填入代价元素
+            distMatrixIn[i * nCols + j] = DistMatrix[i][j]; // 填入代价元素
         }
     }
 

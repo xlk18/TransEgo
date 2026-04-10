@@ -305,7 +305,11 @@ void QuadrotorNMPC::trajCb(const trajectory_msgs::MultiDOFJointTrajectory::Const
             new_ref(9, k) = qz;
         }
 
-        // 下面4维留空或者置零，表示控制量部分（旧的也是这样）
+        // 参考状态的推力设为悬停推力，角速度参考保持为0
+        new_ref(10, k) = params_.mass * params_.gravity;
+        new_ref(11, k) = 0.0;
+        new_ref(12, k) = 0.0;
+        new_ref(13, k) = 0.0;
     }
 
     ref_traj_ = new_ref; // 更新内部参考轨迹

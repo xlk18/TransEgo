@@ -52,6 +52,7 @@ MOTNode::MOTNode(ros::NodeHandle &nh) : input_index_(-1), output_index_(-1), nh_
     pnh.param("max_distance", max_distance_, 1.5);
     pnh.param("max_age", max_age_, 5);
     pnh.param("min_hits", min_hits_, 3);
+    pnh.param("lost_threshold", lost_threshold_, 1);
 
     // 神经网络有关的特征维度与模型路径参数加载（带有默认值保障）
     pnh.param<bool>("use_transformer", use_transformer_, true);
@@ -348,7 +349,7 @@ void MOTNode::trackObjects(const std::vector<BoundingBox> &detections, double dt
             VectorXd init_state = VectorXd::Zero(9); // 初始化状态向量
             init_state.head(3) = det.position.cast<double>();
             init_state.tail(3) = det.dimensions.cast<double>();
-            trackers_.push_back(KalmanFilter(current_id_++, init_state, p_factor_, q_factor_, r_factor_)); // 追加到追踪序列库
+            trackers_.push_back(KalmanFilter(current_id_++, init_state, p_factor_, q_factor_, r_factor_, lost_threshold_)); // 追加到追踪序列库
         }
         return;
     }
@@ -441,7 +442,7 @@ void MOTNode::trackObjects(const std::vector<BoundingBox> &detections, double dt
                 VectorXd init_state = VectorXd::Zero(9);
                 init_state.head(3) = detections[d].position.cast<double>();
                 init_state.tail(3) = detections[d].dimensions.cast<double>();
-                trackers_.push_back(KalmanFilter(current_id_++, init_state, p_factor_, q_factor_, r_factor_)); // 实例化新的卡尔曼滤波器并将其加入追踪列表
+                trackers_.push_back(KalmanFilter(current_id_++, init_state, p_factor_, q_factor_, r_factor_, lost_threshold_)); // 实例化新的卡尔曼滤波器并将其加入追踪列表
             }
         }
     }

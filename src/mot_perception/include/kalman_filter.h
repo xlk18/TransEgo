@@ -21,7 +21,7 @@ enum TrackState
 class KalmanFilter
 {
 public:
-    KalmanFilter(int id, const Eigen::VectorXd &init_state, double p_factor = 10.0, double q_factor = 0.1, double r_factor = 0.1);
+    KalmanFilter(int id, const Eigen::VectorXd &init_state, double p_factor = 10.0, double q_factor = 0.1, double r_factor = 0.1, int lost_threshold = 1);
     void predict(double dt);
     void update(const Eigen::VectorXd &z, int min_hits);
 
@@ -58,5 +58,6 @@ private:
     int age_;
     int hits_;
     int time_since_update_;
+    int lost_threshold_;
     TrackState track_state_;
 };

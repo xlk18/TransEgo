@@ -3,7 +3,7 @@
 using namespace Eigen;
 using namespace std;
 // 构造函数：初始化ID并设置目标的初始状态向量
-KalmanFilter::KalmanFilter(int id, const Eigen::VectorXd &init_state, double p_factor, double q_factor, double r_factor) : id_(id)
+KalmanFilter::KalmanFilter(int id, const Eigen::VectorXd &init_state, double p_factor, double q_factor, double r_factor, int lost_threshold) : id_(id), lost_threshold_(lost_threshold)
 {
     state_dim_ = 9; // 状态向量维度为9：位置(x,y,z)，速度(vx,vy,vz)，尺寸(w,h,d)
     meas_dim_ = 6;  // 观测向量维度为6：位置(x,y,z)，尺寸(w,h,d)
@@ -48,7 +48,7 @@ void KalmanFilter::predict(double dt)
 
     // 如果目标处于确认状态且在上一周期未被观测到(未进入update流程)，则将其状态设为丢失
     // time_since_update_ 只有在 > 1 时才意味着至少错过了一次关联
-    if (time_since_update_ > 1 && track_state_ == CONFIRMED)
+    if (time_since_update_ > lost_threshold_ && track_state_ == CONFIRMED)
     {
         track_state_ = LOST;
     }

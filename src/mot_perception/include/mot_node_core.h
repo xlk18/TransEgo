@@ -69,6 +69,7 @@ private:
     double max_distance_;
     int max_age_;
     int min_hits_;
+    int lost_threshold_;
 
     // --- 新增参数化逻辑配置 ---
     bool use_transformer_;         // 是否启用 Transformer 模型进行预测
